@@ -135,24 +135,14 @@ func main() {
 		
 		log.Printf("Calendar handler registered")
 
-		// Start HTTP server - not in a goroutine for clearer debugging
+		// Start HTTP server - correctly in a goroutine
 		log.Printf("Starting HTTP server on %s", *httpAddr)
-		
-		// Create a separate goroutine for the server so we can continue execution
 		go func() {
-			// Try each address separately to diagnose which is causing problems
-			log.Printf("Testing server on 127.0.0.1%s", *httpAddr)
-			err := http.ListenAndServe("127.0.0.1"+*httpAddr, nil)
-			log.Fatalf("*** HTTP server on 127.0.0.1 failed: %v ***", err)
+			err := http.ListenAndServe(*httpAddr, nil)
+			log.Fatalf("*** HTTP server failed: %v ***", err)
 		}()
 		
-		// Allow some time for the server to start
-		time.Sleep(2 * time.Second)
-		
-		// Try to open a second server on all interfaces to see if there's a binding issue
-		log.Printf("Starting HTTP server on 0.0.0.0%s", *httpAddr)
-		err := http.ListenAndServe("0.0.0.0"+*httpAddr, nil)
-		log.Fatalf("*** HTTP server on 0.0.0.0 failed: %v ***", err)
+		log.Printf("HTTP server is now running")
 	}
 
 	// Set up periodic merges
