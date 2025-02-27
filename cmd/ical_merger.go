@@ -103,11 +103,14 @@ func main() {
 		http.HandleFunc("/calendar", func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Calendar request received from %s", r.RemoteAddr)
 			
-			// Force merge to get the latest data
-			if err := merger.Merge(); err != nil {
-				log.Printf("Error merging calendars: %v", err)
-				http.Error(w, fmt.Sprintf("Error merging calendars: %v", err), http.StatusInternalServerError)
-				return
+			// Only refresh cache if the nocache parameter is set
+			if r.URL.Query().Get("nocache") != "" {
+				log.Printf("Nocache parameter set, refreshing calendar data")
+				if err := merger.Merge(); err != nil {
+					log.Printf("Error merging calendars: %v", err)
+					http.Error(w, fmt.Sprintf("Error merging calendars: %v", err), http.StatusInternalServerError)
+					return
+				}
 			}
 
 			log.Printf("Opening calendar file from: %s", cfg.OutputPath)
@@ -123,7 +126,11 @@ func main() {
 			// Set content type and headers
 			w.Header().Set("Content-Type", "text/calendar")
 			w.Header().Set("Content-Disposition", "attachment; filename=\"merged.ics\"")
-
+			
+			// Set caching headers based on the calendar sync interval
+			maxAge := cfg.SyncIntervalMinutes * 60 // Convert minutes to seconds
+			w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d, public", maxAge))
+			
 			// Copy the file to the response
 			if _, err := io.Copy(w, file); err != nil {
 				log.Printf("Error sending calendar: %v", err)
