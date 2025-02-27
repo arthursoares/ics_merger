@@ -1,62 +1,93 @@
 <style>
-  :root {
-    --background-color: #ffffff;
-    --text-color: #000000;
-    --accent-color: #333333;
-    --border-color: #cccccc;
-    --highlight-color: #f0f0f0;
-  }
-  
   body {
     font-family: 'NicoPups', sans-serif;
-    background-color: var(--background-color);
-    color: var(--text-color);
     margin: 0;
     padding: 0;
+    -webkit-font-smoothing: none !important;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    max-width: 384px; /* TRMNL screen width */
   }
   
   .calendar-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    padding: 20px;
+    padding: 10px;
     box-sizing: border-box;
+    max-height: 192px; /* TRMNL screen height */
+    overflow: hidden;
   }
   
-  .calendar-header {
+  .title-bar {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    border-bottom: 1px dashed var(--border-color);
-    padding-bottom: 10px;
+    gap: 6px;
+    margin-bottom: 4px;
+    position: relative;
+    padding-bottom: 4px;
   }
   
-  .calendar-title {
-    font-size: 24px;
+  .title-bar::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: repeat url(https://usetrmnl.com/images/borders/2.png);
+  }
+  
+  .title {
+    font-size: 16px;
     font-weight: bold;
   }
   
-  .calendar-subtitle {
+  .events-count {
     font-size: 12px;
-    color: var(--accent-color);
+    margin-left: auto;
   }
   
-  .day-container {
-    margin-bottom: 20px;
+  .days-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    overflow-y: auto;
+    max-height: 148px; /* Allow scrolling if content exceeds screen */
+  }
+  
+  .day-column {
+    flex: 1;
+    min-width: 168px;
+    max-width: 174px;
   }
   
   .day-header {
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid var(--border-color);
+    font-family: 'NicoClean', sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    margin-bottom: 4px;
+    position: relative;
+    padding-bottom: 2px;
+  }
+  
+  .day-header::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: repeat url(https://usetrmnl.com/images/borders/5.png);
   }
   
   .day-today {
-    color: var(--accent-color);
-    border-bottom: 2px solid var(--accent-color);
+    font-weight: bold;
+  }
+  
+  .day-today::after {
+    height: 2px;
+    background: repeat url(https://usetrmnl.com/images/borders/2.png);
   }
   
   .events-list {
@@ -66,83 +97,120 @@
   
   .event-item {
     display: flex;
-    padding: 8px 0;
-    border-bottom: 1px dashed var(--border-color);
+    padding: 2px 0;
+    font-size: 16px;
+    line-height: 12px;
+    position: relative;
   }
   
-  .event-item:last-child {
-    border-bottom: none;
+  .event-item::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: repeat url(https://usetrmnl.com/images/borders/5.png);
   }
   
-  .event-time {
-    flex: 0 0 80px;
-    font-size: 14px;
+  .event-item:last-child::after {
+    display: none;
+  }
+  
+  .event-meta {
+    flex: 0 0 15px;
+    text-align: center;
+    margin-right: 4px;
+  }
+  
+  .event-index {
+    font-size: 16px;
   }
   
   .event-all-day {
-    flex: 0 0 80px;
-    font-style: italic;
-    font-size: 14px;
+    font-size: 16px;
   }
   
   .event-content {
     flex: 1;
+    display: flex;
+    flex-direction: column;
   }
   
   .event-title {
     font-size: 16px;
-    font-weight: 500;
-    margin-bottom: 4px;
+    line-height: 12px;
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   
-  .event-location {
+  .event-time {
     font-size: 12px;
-    color: var(--accent-color);
-    margin-bottom: 4px;
+    text-decoration: underline;
   }
   
-  .calendar-footer {
-    font-size: 12px;
-    color: var(--accent-color);
-    text-align: center;
-    margin-top: auto;
-    padding-top: 10px;
-    border-top: 1px dashed var(--border-color);
+  .more-events {
+    font-size: 16px;
+    line-height: 12px;
+    margin-top: 4px;
   }
 </style>
 
 <div class="calendar-container">
-  <div class="calendar-header">
-    <div class="calendar-title">Calendar Summary</div>
-    <div class="calendar-subtitle">{{ total_events }} events upcoming</div>
+  <div class="title-bar">
+    <span class="title">Upcoming Events</span>
+    <span class="events-count">{{ total_events }} events</span>
   </div>
   
-  {% for day in days %}
-    <div class="day-container">
-      <div class="day-header {% if day.is_today %}day-today{% endif %}">
-        {{ day.date_fmt }}
-      </div>
-      <div class="events-list">
-        {% for event in day.events %}
-          <div class="event-item">
-            {% if event.all_day %}
-              <div class="event-all-day">All day</div>
-            {% else %}
-              <div class="event-time">{{ event.start }}{% if event.end != "" %} - {{ event.end }}{% endif %}</div>
-            {% endif %}
-            <div class="event-content">
-              <div class="event-title">{{ event.summary }}</div>
-              {% if event.location != "" %}
-                <div class="event-location">📍 {{ event.location }}</div>
-              {% endif %}
+  <div class="days-container">
+    {% assign visible_days = days | slice: 0, 3 %}
+    {% for day in visible_days %}
+      <div class="day-column">
+        <div class="day-header {% if day.is_today %}day-today{% endif %}">
+          {{ day.date_fmt }}
+        </div>
+        
+        <div class="events-list">
+          {% assign all_day_events = day.events | where: "all_day", true | slice: 0, 4 %}
+          {% assign regular_events = day.events | where: "all_day", false %}
+          {% assign visible_regular_events = regular_events | slice: 0, 7 | minus: all_day_events.size %}
+          {% assign hidden_events_count = day.events.size | minus: all_day_events.size | minus: visible_regular_events.size %}
+          
+          {% for event in all_day_events %}
+            <div class="event-item">
+              <div class="event-meta">
+                <span class="event-all-day">#</span>
+              </div>
+              <div class="event-content">
+                <span class="event-title">{{ event.summary }}</span>
+              </div>
             </div>
-          </div>
-        {% endfor %}
+          {% endfor %}
+          
+          {% for event in visible_regular_events %}
+            <div class="event-item">
+              <div class="event-meta">
+                <span class="event-index">{{ forloop.index }}</span>
+              </div>
+              <div class="event-content">
+                <span class="event-title">{{ event.summary }}</span>
+                <span class="event-time">{{ event.start }} - {{ event.end }}</span>
+              </div>
+            </div>
+          {% endfor %}
+          
+          {% if hidden_events_count > 0 %}
+            <div class="event-item">
+              <div class="event-meta"></div>
+              <div class="event-content">
+                <span class="more-events">And {{ hidden_events_count }} more</span>
+              </div>
+            </div>
+          {% endif %}
+        </div>
       </div>
-    </div>
-  {% endfor %}
-  
-  <div class="calendar-footer">
-    Calendar data from {{ date_range.start }} to {{ date_range.end }}
+    {% endfor %}
   </div>
 </div>
