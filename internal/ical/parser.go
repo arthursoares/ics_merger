@@ -99,8 +99,10 @@ func preprocessAppleCalendar(calData string) string {
 	calData = strings.ReplaceAll(calData, "\\,", "##COMMA##")
 	calData = strings.ReplaceAll(calData, "\\;", "##SEMICOLON##")
 	
-	// Remove all carriage returns (ASCII 13, \r) that might cause parsing issues
-	calData = strings.ReplaceAll(calData, "\r", "")
+	// Standardize line endings to proper format
+	// First, normalize all line endings to LF
+	calData = strings.ReplaceAll(calData, "\r\n", "\n")
+	calData = strings.ReplaceAll(calData, "\r", "\n")
 	
 	// Handle folded lines (lines ending with LF + whitespace)
 	lines := strings.Split(calData, "\n")
@@ -164,8 +166,9 @@ func extractValidComponents(calData string) string {
 	var currentLine string
 	
 	for i, line := range lines {
-		// Remove any carriage returns
-		line = strings.ReplaceAll(line, "\r", "")
+		// Normalize line endings
+		line = strings.ReplaceAll(line, "\r\n", "\n")
+		line = strings.ReplaceAll(line, "\r", "\n")
 		
 		// Handle folded lines (continuation lines)
 		if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
@@ -305,6 +308,7 @@ func isSafeProperty(line string) bool {
 		"UID:", "SUMMARY:", "DTSTART", "DTEND", "DTSTAMP", 
 		"DESCRIPTION:", "LOCATION:", "SEQUENCE:", "STATUS:", "TRANSP:",
 		"CREATED:", "LAST-MODIFIED:", "RRULE:", "CATEGORIES:",
+		"CLASS:", "GEO:", "PRIORITY:", "URL:", "COMPLETED:", "DUE:", "PERCENT-COMPLETE:",
 	}
 	
 	for _, prop := range safeProps {
@@ -359,6 +363,8 @@ func createManualCalendar(calStr string) (*ics.Calendar, int) {
 		addPropertyIfExists(event, eventBlock, "DTEND", ics.ComponentPropertyDtEnd)
 		addPropertyIfExists(event, eventBlock, "DESCRIPTION:", ics.ComponentPropertyDescription)
 		addPropertyIfExists(event, eventBlock, "LOCATION:", ics.ComponentPropertyLocation)
+		addPropertyIfExists(event, eventBlock, "STATUS:", ics.ComponentPropertyStatus)
+		addPropertyIfExists(event, eventBlock, "RRULE:", ics.ComponentPropertyRRule)
 		
 		// Only add the event if it has required properties
 		if event.GetProperty(ics.ComponentPropertyDtStart) != nil {
@@ -448,9 +454,9 @@ func validateEventProperties(eventLines []string) bool {
 
 // Event represents a calendar event with additional metadata
 type Event struct {
-	UID         string
-	Summary     string
-	CalendarIDs []string
+	UID          string
+	Summary      string
+	CalendarIDs  []string
 	OriginalEvent *ics.VEvent
 }
 
@@ -459,6 +465,9 @@ func MergeCalendars(calendars map[string]*ics.Calendar) *ics.Calendar {
 	merged := ics.NewCalendar()
 	merged.SetMethod(ics.MethodPublish)
 	merged.SetProductId("-//ical_merger//GO")
+	merged.SetProperty(ics.ComponentPropertyCalscale, "GREGORIAN")
+	merged.SetProperty(ics.ComponentPropertyMethod, "PUBLISH")
+	merged.SetProperty(ics.ComponentPropertyXWrCalname, "Merged Calendar")
 	
 	// Track events by summary to identify duplicates
 	eventMap := make(map[string]*Event)
@@ -504,6 +513,12 @@ func MergeCalendars(calendars map[string]*ics.Calendar) *ics.Calendar {
 		}
 		if desc := event.OriginalEvent.GetProperty(ics.ComponentPropertyDescription); desc != nil {
 			newEvent.SetProperty(ics.ComponentPropertyDescription, desc.Value)
+		}
+		if status := event.OriginalEvent.GetProperty(ics.ComponentPropertyStatus); status != nil {
+			newEvent.SetProperty(ics.ComponentPropertyStatus, status.Value)
+		}
+		if rrule := event.OriginalEvent.GetProperty(ics.ComponentPropertyRRule); rrule != nil {
+			newEvent.SetProperty(ics.ComponentPropertyRRule, rrule.Value)
 		}
 		
 		// If the event appears in only one calendar, prepend the calendar name

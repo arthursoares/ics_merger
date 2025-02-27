@@ -124,8 +124,11 @@ func main() {
 			defer file.Close()
 
 			// Set content type and headers
-			w.Header().Set("Content-Type", "text/calendar")
+			w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 			w.Header().Set("Content-Disposition", "attachment; filename=\"merged.ics\"")
+			
+			// Set X-WR headers that some clients expect
+			w.Header().Set("X-WR-CALNAME", "Merged Calendar")
 			
 			// Set caching headers based on the calendar sync interval
 			maxAge := cfg.SyncIntervalMinutes * 60 // Convert minutes to seconds
