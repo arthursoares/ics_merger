@@ -3,25 +3,40 @@ package ical
 import (
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/arran4/golang-ical"
 )
 
-// FetchCalendar retrieves an iCalendar from a URL
-func FetchCalendar(url string) (*ics.Calendar, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+// FetchCalendar retrieves an iCalendar from a URL or local file path
+func FetchCalendar(source string) (*ics.Calendar, error) {
+	var calData []byte
+	var err error
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	// Check if the source is a local file
+	if strings.HasPrefix(source, "file://") {
+		// Extract the file path from the URL
+		filePath := strings.TrimPrefix(source, "file://")
+		calData, err = os.ReadFile(filePath)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Treat as a URL
+		resp, err := http.Get(source)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		calData, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	cal, err := ics.ParseCalendar(strings.NewReader(string(body)))
+	cal, err := ics.ParseCalendar(strings.NewReader(string(calData)))
 	if err != nil {
 		return nil, err
 	}
