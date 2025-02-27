@@ -9,10 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/arthur/ical_merger/internal/app"
 	"github.com/arthur/ical_merger/internal/config"
+	"github.com/arthur/ical_merger/internal/ical"
 )
 
 func main() {
@@ -147,6 +149,70 @@ func main() {
 		})
 		
 		log.Printf("Calendar handler registered")
+		
+		// HTTP handler to serve a summary calendar (±30 days from current date)
+		http.HandleFunc("/summary", func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("Summary calendar request received from %s", r.RemoteAddr)
+			
+			// Only refresh cache if the nocache parameter is set
+			if r.URL.Query().Get("nocache") != "" {
+				log.Printf("Nocache parameter set, refreshing calendar data")
+				if err := merger.Merge(); err != nil {
+					log.Printf("Error merging calendars: %v", err)
+					http.Error(w, fmt.Sprintf("Error merging calendars: %v", err), http.StatusInternalServerError)
+					return
+				}
+			}
+
+			// Open the merged calendar file
+			file, err := os.Open(cfg.OutputPath)
+			if err != nil {
+				log.Printf("Error opening calendar file: %v", err)
+				http.Error(w, fmt.Sprintf("Error opening calendar file: %v", err), http.StatusInternalServerError)
+				return
+			}
+			defer file.Close()
+			
+			// Parse the calendar
+			calData, err := io.ReadAll(file)
+			if err != nil {
+				log.Printf("Error reading calendar file: %v", err)
+				http.Error(w, fmt.Sprintf("Error reading calendar file: %v", err), http.StatusInternalServerError)
+				return
+			}
+			
+			calendar, err := ical.ParseCalendar(strings.NewReader(string(calData)))
+			if err != nil {
+				log.Printf("Error parsing calendar: %v", err)
+				http.Error(w, fmt.Sprintf("Error parsing calendar: %v", err), http.StatusInternalServerError)
+				return
+			}
+			
+			// Filter events to ±30 days
+			filteredCalendar := ical.FilterCalendarByDateRange(calendar, 30, 30)
+			
+			// Set content type and headers
+			w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+			w.Header().Set("Content-Disposition", "attachment; filename=\"summary.ics\"")
+			w.Header().Set("X-WR-CALNAME", "Summary Calendar")
+			
+			// Set caching headers
+			maxAge := cfg.SyncIntervalMinutes * 60 // Convert minutes to seconds
+			w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d, public", maxAge))
+			w.Header().Set("Transfer-Encoding", "identity")
+			
+			// Serialize and return the filtered calendar
+			output := filteredCalendar.Serialize()
+			if _, err := w.Write([]byte(output)); err != nil {
+				log.Printf("Error sending summary calendar: %v", err)
+				http.Error(w, fmt.Sprintf("Error sending summary calendar: %v", err), http.StatusInternalServerError)
+				return
+			}
+			
+			log.Printf("Successfully served summary calendar to %s", r.RemoteAddr)
+		})
+		
+		log.Printf("Summary calendar handler registered")
 
 		// Start HTTP server - correctly in a goroutine
 		log.Printf("Starting HTTP server on %s", *httpAddr)

@@ -577,3 +577,65 @@ func MergeCalendars(calendars map[string]*ics.Calendar) *ics.Calendar {
 	
 	return merged
 }
+
+// ParseCalendar parses an iCalendar string into a calendar object
+func ParseCalendar(reader io.Reader) (*ics.Calendar, error) {
+	return ics.ParseCalendar(reader)
+}
+
+// FilterCalendarByDateRange returns a new calendar with events filtered by date range
+func FilterCalendarByDateRange(cal *ics.Calendar, daysBack, daysForward int) *ics.Calendar {
+	filtered := ics.NewCalendar()
+	filtered.SetMethod(ics.MethodPublish)
+	filtered.SetProductId("-//ical_merger//GO")
+	
+	now := time.Now()
+	startDate := now.AddDate(0, 0, -daysBack)    // 30 days back
+	endDate := now.AddDate(0, 0, daysForward)    // 30 days forward
+	
+	// Start of the current day
+	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
+	
+	// End of the last day
+	endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 0, endDate.Location())
+	
+	for _, event := range cal.Events() {
+		// Parse event start date
+		dtstartProp := event.GetProperty(ics.ComponentPropertyDtStart)
+		if dtstartProp == nil {
+			continue // Skip events without start date
+		}
+		
+		// Try multiple date formats
+		var eventStart time.Time
+		var err error
+		
+		dateFormats := []string{
+			"20060102T150405Z",     // Basic UTC format
+			"20060102T150405",      // Basic local format
+			"20060102",             // Date only format
+		}
+		
+		dtStartValue := dtstartProp.Value
+		
+		for _, format := range dateFormats {
+			eventStart, err = time.Parse(format, dtStartValue)
+			if err == nil {
+				break
+			}
+		}
+		
+		if err != nil {
+			log.Printf("Could not parse start date for event: %s", 
+				event.GetProperty(ics.ComponentPropertySummary).Value)
+			continue
+		}
+		
+		// Check if the event is within our date range
+		if eventStart.After(startDate) && eventStart.Before(endDate) {
+			filtered.AddVEvent(event)
+		}
+	}
+	
+	return filtered
+}
