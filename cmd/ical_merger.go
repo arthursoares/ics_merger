@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/arthur/ical_merger/internal/app"
@@ -15,6 +16,20 @@ import (
 )
 
 func main() {
+	// Early log to confirm process started
+	log.Printf("iCal Merger starting up...")
+	
+	// Set up panic handling
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("PANIC RECOVERED: %v", r)
+			// Print stack trace
+			buf := make([]byte, 4096)
+			n := runtime.Stack(buf, false)
+			log.Printf("STACK TRACE: %s", buf[:n])
+		}
+	}()
+	
 	// Command line flags
 	var (
 		serveMode      = flag.Bool("serve", false, "Run as HTTP server")
@@ -24,7 +39,11 @@ func main() {
 		localMode      = flag.Bool("local", false, "Run with local files instead of URLs")
 		calendarDir    = flag.String("calendar-dir", "./calendars", "Directory containing calendar files when using local mode")
 	)
+	
+	// Log command-line arguments
+	log.Printf("Parsing command line flags: %v", os.Args)
 	flag.Parse()
+	log.Printf("serveMode=%v, httpAddr=%s", *serveMode, *httpAddr)
 
 	// Set config path from flag or env var
 	if *configPath != "" {
@@ -60,12 +79,25 @@ func main() {
 
 	// Run as HTTP server if in serve mode
 	if *serveMode {
+		log.Printf("Entering serve mode setup")
+		
 		// Add root handler for easy testing
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Received request for: %s", r.URL.Path)
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("iCal Merger is running. Use /calendar to access the merged calendar."))
 		})
+		
+		log.Printf("Root handler registered")
+		
+		// HTTP handler for health check - keep this simple to test basic functionality
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("Health check request received from %s", r.RemoteAddr)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		})
+		
+		log.Printf("Health check handler registered")
 		
 		// HTTP handler to serve the merged calendar
 		http.HandleFunc("/calendar", func(w http.ResponseWriter, r *http.Request) {
@@ -100,34 +132,27 @@ func main() {
 			}
 			log.Printf("Successfully served calendar to %s", r.RemoteAddr)
 		})
+		
+		log.Printf("Calendar handler registered")
 
-		// HTTP handler for health check
-		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("Health check request received from %s", r.RemoteAddr)
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("OK"))
-		})
-
-		// Start HTTP server directly (not in a goroutine) to catch initialization errors
+		// Start HTTP server - not in a goroutine for clearer debugging
 		log.Printf("Starting HTTP server on %s", *httpAddr)
+		
+		// Create a separate goroutine for the server so we can continue execution
 		go func() {
-			err := http.ListenAndServe(*httpAddr, nil)
-			// This will only be reached if the server fails to start or crashes
-			log.Fatalf("*** HTTP server failed: %v ***", err)
+			// Try each address separately to diagnose which is causing problems
+			log.Printf("Testing server on 127.0.0.1%s", *httpAddr)
+			err := http.ListenAndServe("127.0.0.1"+*httpAddr, nil)
+			log.Fatalf("*** HTTP server on 127.0.0.1 failed: %v ***", err)
 		}()
 		
-		// Wait a moment to ensure server starts properly
-		time.Sleep(500 * time.Millisecond)
-		log.Printf("HTTP server initialized. Testing if it's accessible...")
+		// Allow some time for the server to start
+		time.Sleep(2 * time.Second)
 		
-		// Self-test to verify server is reachable
-		resp, err := http.Get(fmt.Sprintf("http://localhost%s/health", *httpAddr))
-		if err != nil {
-			log.Printf("WARNING: Self-test failed: %v", err)
-		} else {
-			resp.Body.Close()
-			log.Printf("Self-test successful: HTTP server is running properly")
-		}
+		// Try to open a second server on all interfaces to see if there's a binding issue
+		log.Printf("Starting HTTP server on 0.0.0.0%s", *httpAddr)
+		err := http.ListenAndServe("0.0.0.0"+*httpAddr, nil)
+		log.Fatalf("*** HTTP server on 0.0.0.0 failed: %v ***", err)
 	}
 
 	// Set up periodic merges
