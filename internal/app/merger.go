@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/arthur/ical_merger/internal/config"
 	"github.com/arthur/ical_merger/internal/ical"
@@ -38,12 +39,26 @@ func (m *Merger) Merge() error {
 	}
 
 	if len(calendars) == 0 {
+		log.Println("No calendars were successfully fetched. No output generated.")
 		return nil
 	}
 
 	// Merge the calendars
 	log.Println("Merging calendars")
 	merged := ical.MergeCalendars(calendars)
+
+	// Ensure we have at least one event in the merged calendar
+	if len(merged.Events()) == 0 {
+		log.Println("No events found in any calendar, creating dummy event")
+		// Add a dummy event if the calendar is empty
+		dummyEvent := ics.NewEvent("dummy-event-" + time.Now().Format("20060102150405"))
+		dummyEvent.SetProperty(ics.ComponentPropertySummary, "Calendar Merger Info")
+		dummyEvent.SetProperty(ics.ComponentPropertyDescription, "No valid events were found in any of the source calendars")
+		now := time.Now()
+		dummyEvent.SetProperty(ics.ComponentPropertyDtStart, now.Format("20060102T150405Z"))
+		dummyEvent.SetProperty(ics.ComponentPropertyDtEnd, now.Add(time.Hour).Format("20060102T150405Z"))
+		merged.AddVEvent(dummyEvent)
+	}
 
 	// Ensure output directory exists
 	outputDir := filepath.Dir(m.cfg.OutputPath)
@@ -58,8 +73,13 @@ func (m *Merger) Merge() error {
 	}
 	defer file.Close()
 
-	log.Printf("Writing merged calendar to %s", m.cfg.OutputPath)
-	// Serialize returns a string, not an error
-	merged.Serialize(file)
+	log.Printf("Writing merged calendar to %s (%d events)", m.cfg.OutputPath, len(merged.Events()))
+	
+	// Serialize the calendar to the file
+	output := merged.Serialize()
+	if _, err := file.WriteString(output); err != nil {
+		return err
+	}
+	
 	return nil
 }
