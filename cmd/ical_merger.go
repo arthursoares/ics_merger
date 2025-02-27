@@ -485,13 +485,72 @@ func main() {
 			output := filteredCalendar.Serialize()
 			
 			// Add required properties for Ruby client compatibility
-			// Insert the necessary calendar properties after VERSION:2.0
-			enhancedOutput := strings.Replace(
-				output,
-				"VERSION:2.0",
-				"VERSION:2.0\nCALSCALE:GREGORIAN\nX-WR-CALNAME:Summary Calendar\nX-WR-TIMEZONE:Europe/Berlin",
-				1,
-			)
+			// Insert the necessary calendar properties and VTIMEZONEs
+			var enhancedLines []string
+			
+			// First add the calendar properties
+			for _, line := range strings.Split(output, "\n") {
+				enhancedLines = append(enhancedLines, line)
+				if line == "VERSION:2.0" {
+					enhancedLines = append(enhancedLines, "CALSCALE:GREGORIAN")
+					enhancedLines = append(enhancedLines, "X-WR-CALNAME:Summary Calendar")
+					enhancedLines = append(enhancedLines, "X-WR-TIMEZONE:Europe/Berlin")
+				}
+			}
+			
+			// Fix any date formatting issues for Ruby icalendar library
+			// Specifically all DATE-only fields need VALUE=DATE parameter
+			for i, line := range enhancedLines {
+				// Fix all-day events by adding VALUE=DATE
+				if strings.HasPrefix(line, "DTSTART:") && len(line) == 17 { // Format: DTSTART:20250208
+					enhancedLines[i] = strings.Replace(line, "DTSTART:", "DTSTART;VALUE=DATE:", 1)
+				}
+				if strings.HasPrefix(line, "DTEND:") && len(line) == 15 { // Format: DTEND:20250208
+					enhancedLines[i] = strings.Replace(line, "DTEND:", "DTEND;VALUE=DATE:", 1)
+				}
+				
+				// Fix any timezone info for recurring events
+				if strings.HasPrefix(line, "DTSTART:") && strings.Contains(line, "T") { // timed event
+					enhancedLines[i] = strings.Replace(line, "DTSTART:", "DTSTART;TZID=Europe/Berlin:", 1)
+				}
+				if strings.HasPrefix(line, "DTEND:") && strings.Contains(line, "T") { // timed event
+					enhancedLines[i] = strings.Replace(line, "DTEND:", "DTEND;TZID=Europe/Berlin:", 1)
+				}
+			}
+			
+			// Add VTIMEZONE components after the METHOD line if not already present
+			if !strings.Contains(output, "BEGIN:VTIMEZONE") {
+				vtimezoneStr := `BEGIN:VTIMEZONE
+TZID:Europe/Berlin
+BEGIN:STANDARD
+DTSTART:19701101T030000
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
+END:STANDARD
+BEGIN:DAYLIGHT
+DTSTART:19700329T020000
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU
+END:DAYLIGHT
+END:VTIMEZONE`
+				
+				var finalLines []string
+				addedTimezone := false
+				
+				for _, line := range enhancedLines {
+					finalLines = append(finalLines, line)
+					if line == "METHOD:PUBLISH" && !addedTimezone {
+						finalLines = append(finalLines, strings.Split(vtimezoneStr, "\n")...)
+						addedTimezone = true
+					}
+				}
+				
+				enhancedLines = finalLines
+			}
+			
+			enhancedOutput := strings.Join(enhancedLines, "\n")
 			
 			// Send the enhanced output
 			if _, err := w.Write([]byte(enhancedOutput)); err != nil {
