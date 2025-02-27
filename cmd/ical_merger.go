@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -9,12 +10,15 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/arthur/ical_merger/internal/app"
 	"github.com/arthur/ical_merger/internal/config"
 	"github.com/arthur/ical_merger/internal/ical"
+	"github.com/arran4/golang-ical"
 )
 
 func main() {
@@ -149,6 +153,282 @@ func main() {
 		})
 		
 		log.Printf("Calendar handler registered")
+		
+		// HTTP handler to serve calendar data as JSON for TRMNL plugin
+		http.HandleFunc("/api/calendar", func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("Calendar API request received from %s", r.RemoteAddr)
+			
+			// Only refresh cache if the nocache parameter is set
+			if r.URL.Query().Get("nocache") != "" {
+				log.Printf("Nocache parameter set, refreshing calendar data")
+				if err := merger.Merge(); err != nil {
+					log.Printf("Error merging calendars: %v", err)
+					http.Error(w, fmt.Sprintf("Error merging calendars: %v", err), http.StatusInternalServerError)
+					return
+				}
+			}
+
+			// Open the merged calendar file
+			file, err := os.Open(cfg.OutputPath)
+			if err != nil {
+				log.Printf("Error opening calendar file: %v", err)
+				http.Error(w, fmt.Sprintf("Error opening calendar file: %v", err), http.StatusInternalServerError)
+				return
+			}
+			defer file.Close()
+			
+			// Parse the calendar
+			calData, err := io.ReadAll(file)
+			if err != nil {
+				log.Printf("Error reading calendar file: %v", err)
+				http.Error(w, fmt.Sprintf("Error reading calendar file: %v", err), http.StatusInternalServerError)
+				return
+			}
+			
+			calendar, err := ical.ParseCalendar(strings.NewReader(string(calData)))
+			if err != nil {
+				log.Printf("Error parsing calendar: %v", err)
+				http.Error(w, fmt.Sprintf("Error parsing calendar: %v", err), http.StatusInternalServerError)
+				return
+			}
+			
+			// Get date range from query params or use defaults
+			daysBack := 1
+			daysForward := 30
+			if days := r.URL.Query().Get("days_back"); days != "" {
+				if val, err := strconv.Atoi(days); err == nil && val > 0 {
+					daysBack = val
+				}
+			}
+			if days := r.URL.Query().Get("days_forward"); days != "" {
+				if val, err := strconv.Atoi(days); err == nil && val > 0 {
+					daysForward = val
+				}
+			}
+			
+			// Filter events to the specified date range
+			filteredCalendar := ical.FilterCalendarByDateRange(calendar, daysBack, daysForward)
+			
+			// Convert calendar events to JSON format
+			type EventJSON struct {
+				UID         string    `json:"uid"`
+				Summary     string    `json:"summary"`
+				StartTime   time.Time `json:"start_time"`
+				EndTime     time.Time `json:"end_time,omitempty"`
+				StartStr    string    `json:"start"`
+				EndStr      string    `json:"end,omitempty"`
+				Location    string    `json:"location,omitempty"`
+				Description string    `json:"description,omitempty"`
+				AllDay      bool      `json:"all_day"`
+				Categories  []string  `json:"categories,omitempty"`
+				Status      string    `json:"status,omitempty"`
+			}
+			
+			events := []EventJSON{}
+			now := time.Now()
+			today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+			
+			for _, event := range filteredCalendar.Events() {
+				// Extract event properties
+				uid := event.GetProperty(ics.ComponentPropertyUniqueId).Value
+				summary := event.GetProperty(ics.ComponentPropertySummary).Value
+				
+				// Parse start time
+				var startTime time.Time
+				var isAllDay bool
+				
+				startProp := event.GetProperty(ics.ComponentPropertyDtStart)
+				if startProp == nil {
+					continue // Skip events without start time
+				}
+				
+				// Try to parse start time
+				dateFormats := []string{
+					"20060102T150405Z",     // UTC
+					"20060102T150405",      // Local
+					"20060102",             // Date only (all day)
+				}
+				
+				for _, format := range dateFormats {
+					if t, err := time.Parse(format, startProp.Value); err == nil {
+						startTime = t
+						isAllDay = format == "20060102"
+						break
+					}
+				}
+				
+				// Skip events we can't parse
+				if startTime.IsZero() {
+					log.Printf("Skipping event with unparseable date: %s", summary)
+					continue
+				}
+				
+				// Parse end time
+				var endTime time.Time
+				endProp := event.GetProperty(ics.ComponentPropertyDtEnd)
+				if endProp != nil {
+					for _, format := range dateFormats {
+						if t, err := time.Parse(format, endProp.Value); err == nil {
+							endTime = t
+							break
+						}
+					}
+				} else if isAllDay {
+					// For all-day events without end date, assume same day
+					endTime = startTime.AddDate(0, 0, 1)
+				} else {
+					// For timed events without end time, assume 1 hour
+					endTime = startTime.Add(1 * time.Hour)
+				}
+				
+				// Extract location if available
+				var location string
+				locProp := event.GetProperty(ics.ComponentPropertyLocation)
+				if locProp != nil {
+					location = locProp.Value
+				}
+				
+				// Extract description if available
+				var description string
+				descProp := event.GetProperty(ics.ComponentPropertyDescription)
+				if descProp != nil {
+					description = descProp.Value
+				}
+				
+				// Format times for display
+				var startStr, endStr string
+				if isAllDay {
+					startStr = startTime.Format("Jan 2")
+					if startTime.Year() != endTime.Year() || startTime.Month() != endTime.Month() || startTime.Day() != endTime.Day() {
+						endStr = endTime.AddDate(0, 0, -1).Format("Jan 2") // Subtract a day because all-day end dates are exclusive
+					}
+				} else {
+					if startTime.Year() == today.Year() && startTime.Month() == today.Month() && startTime.Day() == today.Day() {
+						startStr = startTime.Format("3:04 PM") // Same day, just show time
+					} else {
+						startStr = startTime.Format("Jan 2 3:04 PM") // Different day, show date and time
+					}
+					
+					if startTime.Year() == endTime.Year() && startTime.Month() == endTime.Month() && startTime.Day() == endTime.Day() {
+						endStr = endTime.Format("3:04 PM") // Same day, just show time
+					} else {
+						endStr = endTime.Format("Jan 2 3:04 PM") // Different day, show date and time
+					}
+				}
+				
+				// Extract categories if available
+				categories := []string{}
+				catProps := event.GetProperties(ics.ComponentPropertyCategories)
+				for _, prop := range catProps {
+					categories = append(categories, strings.Split(prop.Value, ",")...)
+				}
+				
+				// Extract status if available
+				status := "confirmed" // Default status
+				statusProp := event.GetProperty(ics.ComponentPropertyStatus)
+				if statusProp != nil {
+					status = strings.ToLower(statusProp.Value)
+				}
+				
+				// Add event to result
+				events = append(events, EventJSON{
+					UID:         uid,
+					Summary:     summary,
+					StartTime:   startTime,
+					EndTime:     endTime,
+					StartStr:    startStr,
+					EndStr:      endStr,
+					Location:    location,
+					Description: description,
+					AllDay:      isAllDay,
+					Categories:  categories,
+					Status:      status,
+				})
+			}
+			
+			// Sort events by start time
+			sort.Slice(events, func(i, j int) bool {
+				return events[i].StartTime.Before(events[j].StartTime)
+			})
+			
+			// Group events by day for easier template rendering
+			eventsByDay := make(map[string][]EventJSON)
+			for _, event := range events {
+				dateStr := event.StartTime.Format("2006-01-02")
+				eventsByDay[dateStr] = append(eventsByDay[dateStr], event)
+			}
+			
+			// Create a slice of day keys sorted chronologically
+			days := make([]string, 0, len(eventsByDay))
+			for day := range eventsByDay {
+				days = append(days, day)
+			}
+			sort.Strings(days)
+			
+			// Build a formatted result for template rendering
+			type DayInfo struct {
+				Date       string     `json:"date"`
+				DateFmt    string     `json:"date_fmt"`
+				Weekday    string     `json:"weekday"`
+				IsToday    bool       `json:"is_today"`
+				IsTomorrow bool       `json:"is_tomorrow"`
+				Events     []EventJSON `json:"events"`
+			}
+			
+			formattedDays := []DayInfo{}
+			tomorrow := today.AddDate(0, 0, 1)
+			
+			for _, day := range days {
+				date, _ := time.Parse("2006-01-02", day)
+				
+				isToday := date.Year() == today.Year() && date.Month() == today.Month() && date.Day() == today.Day()
+				isTomorrow := date.Year() == tomorrow.Year() && date.Month() == tomorrow.Month() && date.Day() == tomorrow.Day()
+				
+				var dateFmt string
+				if isToday {
+					dateFmt = "Today"
+				} else if isTomorrow {
+					dateFmt = "Tomorrow"
+				} else {
+					dateFmt = date.Format("Monday, Jan 2")
+				}
+				
+				formattedDays = append(formattedDays, DayInfo{
+					Date:       day,
+					DateFmt:    dateFmt,
+					Weekday:    date.Format("Monday"),
+					IsToday:    isToday,
+					IsTomorrow: isTomorrow,
+					Events:     eventsByDay[day],
+				})
+			}
+			
+			// Create the final response
+			response := map[string]interface{}{
+				"days":         formattedDays,
+				"total_events": len(events),
+				"date_range": map[string]string{
+					"start": today.AddDate(0, 0, -daysBack).Format("2006-01-02"),
+					"end":   today.AddDate(0, 0, daysForward).Format("2006-01-02"),
+				},
+				"generated_at": time.Now().Format(time.RFC3339),
+			}
+			
+			// Set content type and headers
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Cache-Control", "max-age=3600")
+			
+			// Serialize and return the JSON
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				log.Printf("Error encoding calendar JSON: %v", err)
+				http.Error(w, fmt.Sprintf("Error encoding calendar JSON: %v", err), http.StatusInternalServerError)
+				return
+			}
+			
+			log.Printf("Successfully served calendar API to %s", r.RemoteAddr)
+		})
+		
+		log.Printf("Calendar API handler registered")
 		
 		// HTTP handler to serve a summary calendar (±30 days from current date)
 		http.HandleFunc("/summary", func(w http.ResponseWriter, r *http.Request) {

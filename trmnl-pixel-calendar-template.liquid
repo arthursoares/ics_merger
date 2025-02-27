@@ -1,0 +1,194 @@
+<style>
+  :root {
+    --background-color: #ffffff;
+    --text-color: #000000;
+    --accent-color: #333333;
+    --border-color: #cccccc;
+    --highlight-color: #f0f0f0;
+  }
+  
+  body {
+    font-family: 'NicoPups', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+  
+  .calendar-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  
+  .calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  
+  .calendar-header::after {
+    content: "";
+    position: absolute;
+    bottom: -10px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: url(https://usetrmnl.com/images/borders/2.png) repeat-x;
+  }
+  
+  .calendar-title {
+    font-size: 24px;
+    font-weight: bold;
+  }
+  
+  .calendar-subtitle {
+    font-size: 14px;
+  }
+  
+  .day-container {
+    margin-bottom: 20px;
+  }
+  
+  .day-header {
+    font-family: 'NicoClean', sans-serif;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    position: relative;
+  }
+  
+  .day-header::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: url(https://usetrmnl.com/images/borders/5.png) repeat-x;
+  }
+  
+  .day-today {
+    color: var(--accent-color);
+  }
+  
+  .day-today::after {
+    background: url(https://usetrmnl.com/images/borders/3.png) repeat-x;
+    height: 2px;
+  }
+  
+  .events-list {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .event-item {
+    display: flex;
+    padding: 8px 0;
+    position: relative;
+  }
+  
+  .event-item::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: url(https://usetrmnl.com/images/borders/1.png) repeat-x;
+  }
+  
+  .event-item:last-child::after {
+    display: none;
+  }
+  
+  .event-time {
+    flex: 0 0 80px;
+    font-size: 14px;
+  }
+  
+  .event-all-day {
+    flex: 0 0 80px;
+    font-style: italic;
+    font-size: 14px;
+  }
+  
+  .event-content {
+    flex: 1;
+  }
+  
+  .event-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  
+  .event-location {
+    font-size: 12px;
+    color: var(--accent-color);
+    margin-bottom: 4px;
+  }
+  
+  .calendar-footer {
+    font-size: 12px;
+    color: var(--accent-color);
+    text-align: center;
+    margin-top: auto;
+    padding-top: 10px;
+    position: relative;
+  }
+  
+  .calendar-footer::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: url(https://usetrmnl.com/images/borders/2.png) repeat-x;
+  }
+</style>
+
+<div class="calendar-container">
+  <div class="calendar-header">
+    <div class="calendar-title">Calendar</div>
+    <div class="calendar-subtitle">{{ total_events }} events</div>
+  </div>
+  
+  {% for day in days %}
+    <div class="day-container">
+      <div class="day-header {% if day.is_today %}day-today{% endif %}">
+        {{ day.date_fmt }}
+      </div>
+      <div class="events-list">
+        {% for event in day.events %}
+          <div class="event-item">
+            {% if event.all_day %}
+              <div class="event-all-day">#</div>
+            {% else %}
+              <div class="event-time">{{ event.start }}</div>
+            {% endif %}
+            <div class="event-content">
+              <div class="event-title">{{ event.summary }}</div>
+              {% if event.location != "" %}
+                <div class="event-location">{{ event.location }}</div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+  
+  <div class="calendar-footer">
+    Updated {{ generated_at | date: "%b %d, %H:%M" }}
+  </div>
+</div>

@@ -1,0 +1,148 @@
+<style>
+  :root {
+    --background-color: #ffffff;
+    --text-color: #000000;
+    --accent-color: #333333;
+    --border-color: #cccccc;
+    --highlight-color: #f0f0f0;
+  }
+  
+  body {
+    font-family: 'NicoPups', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+  }
+  
+  .calendar-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  
+  .calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 10px;
+  }
+  
+  .calendar-title {
+    font-size: 24px;
+    font-weight: bold;
+  }
+  
+  .calendar-subtitle {
+    font-size: 12px;
+    color: var(--accent-color);
+  }
+  
+  .day-container {
+    margin-bottom: 20px;
+  }
+  
+  .day-header {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .day-today {
+    color: var(--accent-color);
+    border-bottom: 2px solid var(--accent-color);
+  }
+  
+  .events-list {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .event-item {
+    display: flex;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--border-color);
+  }
+  
+  .event-item:last-child {
+    border-bottom: none;
+  }
+  
+  .event-time {
+    flex: 0 0 80px;
+    font-size: 14px;
+  }
+  
+  .event-all-day {
+    flex: 0 0 80px;
+    font-style: italic;
+    font-size: 14px;
+  }
+  
+  .event-content {
+    flex: 1;
+  }
+  
+  .event-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  
+  .event-location {
+    font-size: 12px;
+    color: var(--accent-color);
+    margin-bottom: 4px;
+  }
+  
+  .calendar-footer {
+    font-size: 12px;
+    color: var(--accent-color);
+    text-align: center;
+    margin-top: auto;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+  }
+</style>
+
+<div class="calendar-container">
+  <div class="calendar-header">
+    <div class="calendar-title">Calendar Summary</div>
+    <div class="calendar-subtitle">{{ total_events }} events upcoming</div>
+  </div>
+  
+  {% for day in days %}
+    <div class="day-container">
+      <div class="day-header {% if day.is_today %}day-today{% endif %}">
+        {{ day.date_fmt }}
+      </div>
+      <div class="events-list">
+        {% for event in day.events %}
+          <div class="event-item">
+            {% if event.all_day %}
+              <div class="event-all-day">All day</div>
+            {% else %}
+              <div class="event-time">{{ event.start }}{% if event.end != "" %} - {{ event.end }}{% endif %}</div>
+            {% endif %}
+            <div class="event-content">
+              <div class="event-title">{{ event.summary }}</div>
+              {% if event.location != "" %}
+                <div class="event-location">📍 {{ event.location }}</div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+  
+  <div class="calendar-footer">
+    Calendar data from {{ date_range.start }} to {{ date_range.end }}
+  </div>
+</div>
