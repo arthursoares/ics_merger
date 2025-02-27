@@ -170,6 +170,21 @@ func extractValidComponents(calData string) string {
 		line = strings.ReplaceAll(line, "\r\n", "\n")
 		line = strings.ReplaceAll(line, "\r", "\n")
 		
+		// Fix common issues with property parameters
+		// Replace incorrect `:;` with the correct `;` for parameters
+		if strings.Contains(line, "DTSTART::") {
+			line = strings.Replace(line, "DTSTART::", "DTSTART:", 1)
+		}
+		if strings.Contains(line, "DTEND:;") {
+			parts := strings.SplitN(line, "DTEND:;", 2)
+			if len(parts) == 2 {
+				paramValue := strings.SplitN(parts[1], ":", 2)
+				if len(paramValue) == 2 {
+					line = "DTEND;" + paramValue[0] + ":" + paramValue[1]
+				}
+			}
+		}
+		
 		// Handle folded lines (continuation lines)
 		if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
 			// This is a continuation of the previous line
@@ -415,6 +430,11 @@ func extractProperty(eventBlock, propPrefix string) string {
 	lines := strings.Split(eventBlock, "\n")
 	
 	for _, line := range lines {
+		// Fix known issues with double colons and semicolons
+		if strings.Contains(line, "DTSTART::") {
+			line = strings.Replace(line, "DTSTART::", "DTSTART:", 1)
+		}
+		
 		if strings.HasPrefix(line, propPrefix) {
 			// Handle property parameters for properties like DTSTART;TZID=...
 			if strings.Contains(propPrefix, "DTSTART") && strings.HasPrefix(line, "DTSTART;") {
@@ -425,6 +445,15 @@ func extractProperty(eventBlock, propPrefix string) string {
 			}
 			
 			return strings.TrimPrefix(line, propPrefix)
+		}
+		
+		// Handle the property with parameters (e.g., DTEND;TZID=...)
+		baseProp := strings.Split(propPrefix, ":")[0] // Get the base property name without colon
+		if strings.HasPrefix(line, baseProp+";") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				return parts[1]
+			}
 		}
 	}
 	
