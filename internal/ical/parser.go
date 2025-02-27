@@ -585,9 +585,22 @@ func ParseCalendar(reader io.Reader) (*ics.Calendar, error) {
 
 // FilterCalendarByDateRange returns a new calendar with events filtered by date range
 func FilterCalendarByDateRange(cal *ics.Calendar, daysBack, daysForward int) *ics.Calendar {
+	// Create a new calendar with basic properties
 	filtered := ics.NewCalendar()
 	filtered.SetMethod(ics.MethodPublish)
 	filtered.SetProductId("-//ical_merger//GO")
+	
+	// The library doesn't expose direct methods to set these custom properties
+	// In the serialized output, we'll manually add them using the serializer
+	
+	// For X-WR properties, we'll add them during serialization 
+	// Specifically, we need:
+	// CALSCALE:GREGORIAN
+	// X-WR-CALNAME:Summary Calendar
+	// X-WR-TIMEZONE:Europe/Berlin
+	
+	// After serializing the calendar, we can prepend these lines 
+	// as a post-processing step before returning
 	
 	now := time.Now()
 	startDate := now.AddDate(0, 0, -daysBack)    // 30 days back
@@ -633,9 +646,44 @@ func FilterCalendarByDateRange(cal *ics.Calendar, daysBack, daysForward int) *ic
 		
 		// Check if the event is within our date range
 		if eventStart.After(startDate) && eventStart.Before(endDate) {
+			// Fix any malformed properties before adding to filtered calendar
+			fixEventProperties(event)
 			filtered.AddVEvent(event)
 		}
 	}
 	
 	return filtered
+}
+
+// fixEventProperties corrects common iCal property formatting issues
+func fixEventProperties(event *ics.VEvent) {
+	// Fix DTEND or DTSTART with malformed TZID format
+	// Change from: DTEND:;TZID=Europe/Berlin:20250204T230000
+	// To:       DTEND;TZID=Europe/Berlin:20250204T230000
+	for _, propName := range []ics.ComponentProperty{ics.ComponentPropertyDtStart, ics.ComponentPropertyDtEnd} {
+		property := event.GetProperty(propName)
+		if property != nil && strings.HasPrefix(property.Value, ";TZID=") {
+			tzidParts := strings.SplitN(property.Value, ":", 3)
+			if len(tzidParts) == 3 {
+				// This is a malformed property, fix it
+				tzid := strings.TrimPrefix(tzidParts[0], ";TZID=")
+				value := tzidParts[2]
+				
+				// Remove the old property
+				event.RemoveProperty(propName)
+				
+				// Add the fixed property with the correct TZID parameter
+				event.SetProperty(propName, value)
+				
+				// Get the new property and add the TZID parameter manually
+				newProp := event.GetProperty(propName)
+				if newProp != nil {
+					if newProp.ICalParameters == nil {
+						newProp.ICalParameters = make(map[string][]string)
+					}
+					newProp.ICalParameters["TZID"] = []string{tzid}
+				}
+			}
+		}
+	}
 }

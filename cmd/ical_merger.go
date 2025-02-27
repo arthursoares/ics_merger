@@ -201,9 +201,20 @@ func main() {
 			w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d, public", maxAge))
 			w.Header().Set("Transfer-Encoding", "identity")
 			
-			// Serialize and return the filtered calendar
+			// Serialize the filtered calendar
 			output := filteredCalendar.Serialize()
-			if _, err := w.Write([]byte(output)); err != nil {
+			
+			// Add required properties for Ruby client compatibility
+			// Insert the necessary calendar properties after VERSION:2.0
+			enhancedOutput := strings.Replace(
+				output,
+				"VERSION:2.0",
+				"VERSION:2.0\nCALSCALE:GREGORIAN\nX-WR-CALNAME:Summary Calendar\nX-WR-TIMEZONE:Europe/Berlin",
+				1,
+			)
+			
+			// Send the enhanced output
+			if _, err := w.Write([]byte(enhancedOutput)); err != nil {
 				log.Printf("Error sending summary calendar: %v", err)
 				http.Error(w, fmt.Sprintf("Error sending summary calendar: %v", err), http.StatusInternalServerError)
 				return
