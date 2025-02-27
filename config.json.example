@@ -1,0 +1,18 @@
+{
+  "calendars": [
+    {
+      "name": "Home",
+      "url": "https://example.com/home.ics"
+    },
+    {
+      "name": "Arthur",
+      "url": "https://example.com/arthur.ics"
+    },
+    {
+      "name": "Hannah",
+      "url": "https://example.com/hannah.ics"
+    }
+  ],
+  "outputPath": "/app/output/merged.ics",
+  "syncIntervalMinutes": 15
+}

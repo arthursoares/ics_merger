@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  ical_merger:
+    build: .
+    container_name: ical_merger
+    volumes:
+      - ./config.json:/app/config.json
+      - ./output:/app/output
+    restart: unless-stopped

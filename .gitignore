@@ -1,0 +1,34 @@
+# Output binary
+bin/
+ical_merger
+
+# Output directory for merged calendar
+output/
+
+# Config file
+config.json
+
+# Go specific
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Mac
+.DS_Store
