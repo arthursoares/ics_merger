@@ -364,7 +364,11 @@ func createManualCalendar(calStr string) (*ics.Calendar, int) {
 		addPropertyIfExists(event, eventBlock, "DESCRIPTION:", ics.ComponentPropertyDescription)
 		addPropertyIfExists(event, eventBlock, "LOCATION:", ics.ComponentPropertyLocation)
 		addPropertyIfExists(event, eventBlock, "STATUS:", ics.ComponentPropertyStatus)
-		addPropertyIfExists(event, eventBlock, "RRULE:", ics.ComponentPropertyRRule)
+		
+		// RRULE is handled differently
+		if rrule := extractProperty(eventBlock, "RRULE:"); rrule != "" {
+			event.AddProperty("RRULE", rrule)
+		}
 		
 		// Only add the event if it has required properties
 		if event.GetProperty(ics.ComponentPropertyDtStart) != nil {
@@ -465,9 +469,11 @@ func MergeCalendars(calendars map[string]*ics.Calendar) *ics.Calendar {
 	merged := ics.NewCalendar()
 	merged.SetMethod(ics.MethodPublish)
 	merged.SetProductId("-//ical_merger//GO")
-	merged.SetProperty(ics.ComponentPropertyCalscale, "GREGORIAN")
-	merged.SetProperty(ics.ComponentPropertyMethod, "PUBLISH")
-	merged.SetProperty(ics.ComponentPropertyXWrCalname, "Merged Calendar")
+	
+	// Add common calendar properties
+	merged.AddProperty("CALSCALE", "GREGORIAN")
+	merged.AddProperty("METHOD", "PUBLISH")
+	merged.AddProperty("X-WR-CALNAME", "Merged Calendar")
 	
 	// Track events by summary to identify duplicates
 	eventMap := make(map[string]*Event)
@@ -517,8 +523,10 @@ func MergeCalendars(calendars map[string]*ics.Calendar) *ics.Calendar {
 		if status := event.OriginalEvent.GetProperty(ics.ComponentPropertyStatus); status != nil {
 			newEvent.SetProperty(ics.ComponentPropertyStatus, status.Value)
 		}
-		if rrule := event.OriginalEvent.GetProperty(ics.ComponentPropertyRRule); rrule != nil {
-			newEvent.SetProperty(ics.ComponentPropertyRRule, rrule.Value)
+		
+		// RRULE is handled differently
+		if rrule := event.OriginalEvent.GetProperty("RRULE"); rrule != nil {
+			newEvent.AddProperty("RRULE", rrule.Value)
 		}
 		
 		// If the event appears in only one calendar, prepend the calendar name
