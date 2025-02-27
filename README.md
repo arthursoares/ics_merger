@@ -43,7 +43,8 @@ Edit `config.json` to add your calendar sources:
     }
   ],
   "outputPath": "/app/output/merged.ics",
-  "syncIntervalMinutes": 15
+  "syncIntervalMinutes": 15,
+  "outputTimezone": "Europe/Berlin"
 }
 ```
 
@@ -53,6 +54,12 @@ Build and run using Docker Compose:
 
 ```
 docker-compose up -d
+```
+
+You can set a custom timezone using an environment variable:
+
+```
+OUTPUT_TIMEZONE=America/New_York docker-compose up -d
 ```
 
 Or use the provided Makefile:
@@ -153,6 +160,46 @@ LOCATION:Conference Room B
 DESCRIPTION:Weekly project status meeting
 END:VEVENT
 ```
+
+## Testing
+
+The project includes automated tests for both Go code and Ruby iCal format compatibility:
+
+```
+# Run Go tests
+make test
+
+# Run Ruby icalendar compatibility tests
+make test-ruby
+
+# Run all tests
+make test-all
+```
+
+### Docker Testing
+
+You can also run tests in a Docker container using the provided script:
+
+```
+./run-tests.sh
+```
+
+This builds a special test container with both Go and Ruby installed and runs all tests to ensure compatibility.
+
+## Configuration Options
+
+### Output Timezone
+
+You can specify the timezone used for calendar output:
+
+- In `config.json` with the `outputTimezone` property
+- Via environment variable `OUTPUT_TIMEZONE` (when using Docker)
+- Default is `Europe/Berlin` if not specified
+
+The timezone is used for:
+- All timed events (setting the TZID parameter)
+- The VTIMEZONE component in the calendar
+- The X-WR-TIMEZONE property
 
 ## License
 

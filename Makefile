@@ -1,4 +1,4 @@
-.PHONY: build run run-local run-server docker-build docker-run clean
+.PHONY: build run run-local run-server docker-build docker-run clean test test-ruby
 
 build:
 	go build -o bin/ical_merger ./cmd
@@ -20,6 +20,14 @@ docker-run:
 
 docker-logs:
 	docker-compose logs -f
+
+test: build
+	go test ./...
+
+test-ruby: build
+	ruby tests/validate_ical.rb
+
+test-all: test test-ruby
 
 clean:
 	rm -rf bin/ output/
