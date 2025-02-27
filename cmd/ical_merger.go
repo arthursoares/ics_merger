@@ -60,17 +60,29 @@ func main() {
 
 	// Run as HTTP server if in serve mode
 	if *serveMode {
+		// Add root handler for easy testing
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("Received request for: %s", r.URL.Path)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("iCal Merger is running. Use /calendar to access the merged calendar."))
+		})
+		
 		// HTTP handler to serve the merged calendar
 		http.HandleFunc("/calendar", func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("Calendar request received from %s", r.RemoteAddr)
+			
 			// Force merge to get the latest data
 			if err := merger.Merge(); err != nil {
+				log.Printf("Error merging calendars: %v", err)
 				http.Error(w, fmt.Sprintf("Error merging calendars: %v", err), http.StatusInternalServerError)
 				return
 			}
 
+			log.Printf("Opening calendar file from: %s", cfg.OutputPath)
 			// Open the merged calendar file
 			file, err := os.Open(cfg.OutputPath)
 			if err != nil {
+				log.Printf("Error opening calendar file: %v", err)
 				http.Error(w, fmt.Sprintf("Error opening calendar file: %v", err), http.StatusInternalServerError)
 				return
 			}
@@ -82,24 +94,40 @@ func main() {
 
 			// Copy the file to the response
 			if _, err := io.Copy(w, file); err != nil {
+				log.Printf("Error sending calendar: %v", err)
 				http.Error(w, fmt.Sprintf("Error sending calendar: %v", err), http.StatusInternalServerError)
 				return
 			}
+			log.Printf("Successfully served calendar to %s", r.RemoteAddr)
 		})
 
 		// HTTP handler for health check
 		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("Health check request received from %s", r.RemoteAddr)
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("OK"))
 		})
 
-		// Start HTTP server in a goroutine
+		// Start HTTP server directly (not in a goroutine) to catch initialization errors
+		log.Printf("Starting HTTP server on %s", *httpAddr)
 		go func() {
-			log.Printf("Starting HTTP server on %s", *httpAddr)
-			if err := http.ListenAndServe(*httpAddr, nil); err != nil {
-				log.Fatalf("HTTP server failed: %v", err)
-			}
+			err := http.ListenAndServe(*httpAddr, nil)
+			// This will only be reached if the server fails to start or crashes
+			log.Fatalf("*** HTTP server failed: %v ***", err)
 		}()
+		
+		// Wait a moment to ensure server starts properly
+		time.Sleep(500 * time.Millisecond)
+		log.Printf("HTTP server initialized. Testing if it's accessible...")
+		
+		// Self-test to verify server is reachable
+		resp, err := http.Get(fmt.Sprintf("http://localhost%s/health", *httpAddr))
+		if err != nil {
+			log.Printf("WARNING: Self-test failed: %v", err)
+		} else {
+			resp.Body.Close()
+			log.Printf("Self-test successful: HTTP server is running properly")
+		}
 	}
 
 	// Set up periodic merges
