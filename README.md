@@ -157,3 +157,7 @@ END:VEVENT
 ## License
 
 MIT
+
+## Credits
+
+This project's implementation was developed with assistance from Claude Code, which helped create a robust parser with special support for Apple Calendar/iCloud exports and the event merging logic.
