@@ -14,5 +14,6 @@
     }
   ],
   "outputPath": "/app/output/merged.ics",
-  "syncIntervalMinutes": 15
+  "syncIntervalMinutes": 15,
+  "outputTimezone": "Europe/Berlin"
 }

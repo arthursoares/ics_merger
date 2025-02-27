@@ -10,4 +10,6 @@ services:
     volumes:
       - ./config.json:/app/config.json
       - ./output:/app/output
+    environment:
+      - OUTPUT_TIMEZONE=${OUTPUT_TIMEZONE:-Europe/Berlin}
     restart: unless-stopped

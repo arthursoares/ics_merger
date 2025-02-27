@@ -494,7 +494,7 @@ func main() {
 				if line == "VERSION:2.0" {
 					enhancedLines = append(enhancedLines, "CALSCALE:GREGORIAN")
 					enhancedLines = append(enhancedLines, "X-WR-CALNAME:Summary Calendar")
-					enhancedLines = append(enhancedLines, "X-WR-TIMEZONE:Europe/Berlin")
+					enhancedLines = append(enhancedLines, "X-WR-TIMEZONE:"+cfg.OutputTimezone)
 				}
 			}
 			
@@ -511,17 +511,17 @@ func main() {
 				
 				// Fix any timezone info for recurring events
 				if strings.HasPrefix(line, "DTSTART:") && strings.Contains(line, "T") { // timed event
-					enhancedLines[i] = strings.Replace(line, "DTSTART:", "DTSTART;TZID=Europe/Berlin:", 1)
+					enhancedLines[i] = strings.Replace(line, "DTSTART:", "DTSTART;TZID="+cfg.OutputTimezone+":", 1)
 				}
 				if strings.HasPrefix(line, "DTEND:") && strings.Contains(line, "T") { // timed event
-					enhancedLines[i] = strings.Replace(line, "DTEND:", "DTEND;TZID=Europe/Berlin:", 1)
+					enhancedLines[i] = strings.Replace(line, "DTEND:", "DTEND;TZID="+cfg.OutputTimezone+":", 1)
 				}
 			}
 			
 			// Add VTIMEZONE components after the METHOD line if not already present
 			if !strings.Contains(output, "BEGIN:VTIMEZONE") {
-				vtimezoneStr := `BEGIN:VTIMEZONE
-TZID:Europe/Berlin
+				vtimezoneStr := fmt.Sprintf(`BEGIN:VTIMEZONE
+TZID:%s
 BEGIN:STANDARD
 DTSTART:19701101T030000
 TZOFFSETFROM:+0200
@@ -534,7 +534,7 @@ TZOFFSETFROM:+0100
 TZOFFSETTO:+0200
 RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU
 END:DAYLIGHT
-END:VTIMEZONE`
+END:VTIMEZONE`, cfg.OutputTimezone)
 				
 				var finalLines []string
 				addedTimezone := false

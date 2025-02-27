@@ -16,6 +16,7 @@ type Config struct {
 	Calendars          []Calendar `json:"calendars"`
 	OutputPath         string     `json:"outputPath"`
 	SyncIntervalMinutes int       `json:"syncIntervalMinutes"`
+	OutputTimezone     string     `json:"outputTimezone"`
 }
 
 // Load reads configuration from the config file
@@ -43,6 +44,16 @@ func Load() (*Config, error) {
 	// Set default output path if not specified
 	if cfg.OutputPath == "" {
 		cfg.OutputPath = "/app/output/merged.ics"
+	}
+	
+	// Set default timezone if not specified or check environment variable
+	if cfg.OutputTimezone == "" {
+		// Check if environment variable is set
+		if envTz := os.Getenv("OUTPUT_TIMEZONE"); envTz != "" {
+			cfg.OutputTimezone = envTz
+		} else {
+			cfg.OutputTimezone = "Europe/Berlin" // Default timezone
+		}
 	}
 
 	return &cfg, nil

@@ -7,6 +7,10 @@
 - **Run HTTP server**: `./bin/ical_merger -serve`
 - **Docker build**: `docker build -t ical_merger .`
 - **Docker run**: `docker-compose up -d`
+- **Run Go tests**: `make test`
+- **Run Ruby compatibility tests**: `make test-ruby`
+- **Run all tests**: `make test-all`
+- **Run tests in Docker**: `./run-tests.sh`
 
 ## Coding Style
 - **Formatting**: Format code with `gofmt`
