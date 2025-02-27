@@ -59,5 +59,7 @@ func (m *Merger) Merge() error {
 	defer file.Close()
 
 	log.Printf("Writing merged calendar to %s", m.cfg.OutputPath)
-	return merged.Serialize(file)
+	// Serialize returns a string, not an error
+	merged.Serialize(file)
+	return nil
 }

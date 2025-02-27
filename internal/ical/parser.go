@@ -65,7 +65,7 @@ func MergeCalendars(calendars map[string]*ics.Calendar) *ics.Calendar {
 	for calID, cal := range calendars {
 		for _, event := range cal.Events() {
 			summary := event.GetProperty(ics.ComponentPropertySummary).Value
-			uid := event.GetProperty(ics.ComponentPropertyUID).Value
+			uid := event.GetProperty(ics.ComponentPropertyUniqueId).Value
 			
 			if existing, ok := eventMap[summary]; ok {
 				// This is a duplicate event, add calendar ID to the list
@@ -84,18 +84,35 @@ func MergeCalendars(calendars map[string]*ics.Calendar) *ics.Calendar {
 	
 	// Second pass: add events to merged calendar with modified summaries if needed
 	for _, event := range eventMap {
-		// Make a copy of the original event
-		newEvent := event.OriginalEvent.Clone()
+		// Create a new event with the same UID
+		newEvent := ics.NewEvent(event.UID)
+		
+		// Copy key properties from original event
+		if summary := event.OriginalEvent.GetProperty(ics.ComponentPropertySummary); summary != nil {
+			newEvent.SetProperty(ics.ComponentPropertySummary, summary.Value)
+		}
+		if dtstart := event.OriginalEvent.GetProperty(ics.ComponentPropertyDtStart); dtstart != nil {
+			newEvent.SetProperty(ics.ComponentPropertyDtStart, dtstart.Value)
+		}
+		if dtend := event.OriginalEvent.GetProperty(ics.ComponentPropertyDtEnd); dtend != nil {
+			newEvent.SetProperty(ics.ComponentPropertyDtEnd, dtend.Value)
+		}
+		if loc := event.OriginalEvent.GetProperty(ics.ComponentPropertyLocation); loc != nil {
+			newEvent.SetProperty(ics.ComponentPropertyLocation, loc.Value)
+		}
+		if desc := event.OriginalEvent.GetProperty(ics.ComponentPropertyDescription); desc != nil {
+			newEvent.SetProperty(ics.ComponentPropertyDescription, desc.Value)
+		}
 		
 		// If the event appears in only one calendar, prepend the calendar name
 		if len(event.CalendarIDs) == 1 {
-			originalSummary := newEvent.GetProperty(ics.ComponentPropertySummary).Value
-			newSummary := "[" + event.CalendarIDs[0] + "] " + originalSummary
-			
-			// Update the summary property
 			summaryProp := newEvent.GetProperty(ics.ComponentPropertySummary)
 			if summaryProp != nil {
-				summaryProp.Value = newSummary
+				originalSummary := summaryProp.Value
+				newSummary := "[" + event.CalendarIDs[0] + "] " + originalSummary
+				
+				// Update the summary with SetProperty
+				newEvent.SetProperty(ics.ComponentPropertySummary, newSummary)
 			}
 		}
 		
