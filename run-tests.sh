@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script to run all tests including Ruby validation in Docker
 
-# Ensure script exits if any command fails
+# Exit immediately if a command fails
 set -e
 
 echo "Building test container..."

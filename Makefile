@@ -25,7 +25,7 @@ test: build
 	go test ./...
 
 test-ruby: build
-	ruby tests/validate_ical.rb
+	ruby tests/validate_ical_with_ruby.rb
 
 test-all: test test-ruby
 

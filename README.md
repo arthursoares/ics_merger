@@ -1,6 +1,6 @@
 # iCal Merger
 
-A tool to combine multiple iCalendar (.ics) files into a single unified calendar.
+A tool to combine multiple iCalendar (.ics) files into a single unified calendar with Ruby compatibility.
 
 ## Features
 
@@ -9,10 +9,12 @@ A tool to combine multiple iCalendar (.ics) files into a single unified calendar
 - Prepends calendar name to event titles from single-source events (e.g., "[Work] Meeting")
 - Maintains original titles for events that appear in multiple calendars
 - Robust support for Apple Calendar/iCloud exports
+- Ruby iCalendar gem compatibility for all output calendars
 - Periodically updates the merged calendar
 - HTTP server to serve the merged calendar
 - Support for local files or remote URLs
 - Docker containerized for easy deployment
+- Customizable output timezone
 
 ## Getting Started
 
@@ -115,7 +117,9 @@ Usage of ical_merger:
 
 When running in HTTP server mode, the following endpoints are available:
 
-- `/calendar` - Get the merged calendar file
+- `/calendar` - Get the merged calendar file (Ruby-compatible format)
+- `/summary` - Get a filtered ±30 day calendar (Ruby-compatible format)
+- `/api/calendar` - Get calendar data in JSON format for TRMNL plugin
 - `/health` - Health check endpoint
 
 ## How It Works
@@ -147,6 +151,7 @@ The merged calendar maintains all essential event properties while ensuring comp
 - **Preserved properties**: Event dates, times, locations, descriptions, and other properties are preserved
 - **Event UIDs**: Each event maintains its original UID to avoid duplication when importing
 - **Timezone handling**: The calendar preserves timezone information from the source calendars
+- **Ruby compatibility**: All output is compatible with the Ruby iCalendar gem parser
 
 Sample event entry in the merged calendar:
 
@@ -154,8 +159,8 @@ Sample event entry in the merged calendar:
 BEGIN:VEVENT
 UID:12345-67890-ABCDEF
 SUMMARY:[Work] Project Meeting
-DTSTART:20240328T140000
-DTEND:20240328T150000
+DTSTART;TZID=Europe/Berlin:20240328T140000
+DTEND;TZID=Europe/Berlin:20240328T150000
 LOCATION:Conference Room B
 DESCRIPTION:Weekly project status meeting
 END:VEVENT

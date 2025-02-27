@@ -75,9 +75,13 @@ func (m *Merger) Merge() error {
 
 	log.Printf("Writing merged calendar to %s (%d events)", m.cfg.OutputPath, len(merged.Events()))
 	
-	// Serialize the calendar to the file
+	// Serialize the calendar 
 	output := merged.Serialize()
-	if _, err := file.WriteString(output); err != nil {
+	
+	// Apply Ruby compatibility fixes if needed
+	fixedOutput := ical.RubyCompatibilityFixer(output, m.cfg.OutputTimezone)
+	
+	if _, err := file.WriteString(fixedOutput); err != nil {
 		return err
 	}
 	

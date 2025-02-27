@@ -1,12 +1,18 @@
 FROM golang:1.22-alpine
 
-# Install Ruby and development tools for testing
-RUN apk --no-cache add ruby ruby-dev build-base ruby-json tzdata ca-certificates
+# Install Ruby and dependencies for testing
+RUN apk add --no-cache ruby ruby-dev build-base ca-certificates tzdata
 
-# Install required Ruby gems
+# Install Ruby gems for iCalendar testing
 RUN gem install icalendar minitest
 
 WORKDIR /app
+
+# Copy the go modules manifests
+COPY go.mod go.sum ./
+
+# Cache modules
+RUN go mod download
 
 # Copy source code
 COPY . .
@@ -14,5 +20,5 @@ COPY . .
 # Build the application
 RUN go build -o bin/ical_merger ./cmd
 
-# Set the default command for testing
+# Run Go tests by default
 CMD ["make", "test-all"]

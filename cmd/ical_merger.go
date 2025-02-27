@@ -128,6 +128,17 @@ func main() {
 				return
 			}
 			defer file.Close()
+			
+			// Read the calendar file
+			calData, err := io.ReadAll(file)
+			if err != nil {
+				log.Printf("Error reading calendar file: %v", err)
+				http.Error(w, fmt.Sprintf("Error reading calendar file: %v", err), http.StatusInternalServerError)
+				return
+			}
+			
+			// Apply Ruby compatibility fixes
+			fixedCalData := ical.RubyCompatibilityFixer(string(calData), cfg.OutputTimezone)
 
 			// Set content type and headers with charset explicitly specified
 			w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
@@ -143,8 +154,8 @@ func main() {
 			// Signal that the content is complete (not chunked)
 			w.Header().Set("Transfer-Encoding", "identity")
 			
-			// Copy the file to the response
-			if _, err := io.Copy(w, file); err != nil {
+			// Write the fixed calendar data to the response
+			if _, err := w.Write([]byte(fixedCalData)); err != nil {
 				log.Printf("Error sending calendar: %v", err)
 				http.Error(w, fmt.Sprintf("Error sending calendar: %v", err), http.StatusInternalServerError)
 				return
