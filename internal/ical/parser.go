@@ -365,16 +365,10 @@ func createManualCalendar(calStr string) (*ics.Calendar, int) {
 		addPropertyIfExists(event, eventBlock, "LOCATION:", ics.ComponentPropertyLocation)
 		addPropertyIfExists(event, eventBlock, "STATUS:", ics.ComponentPropertyStatus)
 		
-		// RRULE is handled as a raw string to avoid compatibility issues
+		// RRULE is special for Ruby clients
 		if rrule := extractProperty(eventBlock, "RRULE:"); rrule != "" {
-			// Just have to use strings.Split since we know the RRULE property exists
-			// This is a workaround for limitations in the golang-ical library
-			for _, p := range event.Properties {
-				if p.IANAToken == "RRULE" {
-					p.Value = rrule
-					break
-				}
-			}
+			// Set the RRULE property directly using library method
+			event.SetProperty("RRULE", rrule)
 		}
 		
 		// Only add the event if it has required properties
@@ -530,9 +524,10 @@ func MergeCalendars(calendars map[string]*ics.Calendar) *ics.Calendar {
 			newEvent.SetProperty(ics.ComponentPropertyStatus, status.Value)
 		}
 		
-		// RRULE is handled as a raw string to avoid compatibility issues
+		// RRULE needs special handling to be properly formatted for Ruby clients
 		if rrule := event.OriginalEvent.GetProperty("RRULE"); rrule != nil {
-			// Create a new property with the same name and value
+			// The RRULE format should be: RRULE:FREQ=WEEKLY;UNTIL=20250617T120000Z;INTERVAL=1;BYDAY=TU;WKST=SU
+			// This format is expected by the Ruby icalendar gem
 			newEvent.SetProperty("RRULE", rrule.Value)
 		}
 		

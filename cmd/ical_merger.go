@@ -123,7 +123,7 @@ func main() {
 			}
 			defer file.Close()
 
-			// Set content type and headers
+			// Set content type and headers with charset explicitly specified
 			w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 			w.Header().Set("Content-Disposition", "attachment; filename=\"merged.ics\"")
 			
@@ -133,6 +133,9 @@ func main() {
 			// Set caching headers based on the calendar sync interval
 			maxAge := cfg.SyncIntervalMinutes * 60 // Convert minutes to seconds
 			w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d, public", maxAge))
+			
+			// Signal that the content is complete (not chunked)
+			w.Header().Set("Transfer-Encoding", "identity")
 			
 			// Copy the file to the response
 			if _, err := io.Copy(w, file); err != nil {
