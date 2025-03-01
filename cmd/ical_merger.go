@@ -520,18 +520,30 @@ func main() {
 			for i, line := range enhancedLines {
 				// Fix all-day events by adding VALUE=DATE
 				if strings.HasPrefix(line, "DTSTART:") && len(line) == 17 { // Format: DTSTART:20250208
-					enhancedLines[i] = strings.Replace(line, "DTSTART:", "DTSTART;VALUE=DATE:", 1)
+					// Check that we're not accidentally adding a duplicate parameter
+					if !strings.Contains(line, "VALUE=DATE") {
+						enhancedLines[i] = strings.Replace(line, "DTSTART:", "DTSTART;VALUE=DATE:", 1)
+					}
 				}
 				if strings.HasPrefix(line, "DTEND:") && len(line) == 15 { // Format: DTEND:20250208
-					enhancedLines[i] = strings.Replace(line, "DTEND:", "DTEND;VALUE=DATE:", 1)
+					// Check that we're not accidentally adding a duplicate parameter
+					if !strings.Contains(line, "VALUE=DATE") {
+						enhancedLines[i] = strings.Replace(line, "DTEND:", "DTEND;VALUE=DATE:", 1)
+					}
 				}
 				
 				// Fix any timezone info for recurring events
 				if strings.HasPrefix(line, "DTSTART:") && strings.Contains(line, "T") { // timed event
-					enhancedLines[i] = strings.Replace(line, "DTSTART:", "DTSTART;TZID="+cfg.OutputTimezone+":", 1)
+					// Check that we're not accidentally adding a duplicate parameter
+					if !strings.Contains(line, "TZID=") {
+						enhancedLines[i] = strings.Replace(line, "DTSTART:", "DTSTART;TZID="+cfg.OutputTimezone+":", 1)
+					}
 				}
 				if strings.HasPrefix(line, "DTEND:") && strings.Contains(line, "T") { // timed event
-					enhancedLines[i] = strings.Replace(line, "DTEND:", "DTEND;TZID="+cfg.OutputTimezone+":", 1)
+					// Check that we're not accidentally adding a duplicate parameter
+					if !strings.Contains(line, "TZID=") {
+						enhancedLines[i] = strings.Replace(line, "DTEND:", "DTEND;TZID="+cfg.OutputTimezone+":", 1)
+					}
 				}
 			}
 			
@@ -567,7 +579,21 @@ END:VTIMEZONE`, cfg.OutputTimezone)
 				enhancedLines = finalLines
 			}
 			
-			enhancedOutput := strings.Join(enhancedLines, "\n")
+			// Fix any malformed properties that might already have duplicate parameters
+			// For example: DTEND;VALUE=DATE:;VALUE=DATE:20250219
+			var fixedLines []string
+			for _, line := range enhancedLines {
+				// Fix malformed DTEND with duplicate parameters
+				if strings.Contains(line, "DTEND;VALUE=DATE:;VALUE=DATE:") {
+					line = strings.Replace(line, "DTEND;VALUE=DATE:;VALUE=DATE:", "DTEND;VALUE=DATE:", 1)
+				}
+				if strings.Contains(line, "DTEND;TZID="+cfg.OutputTimezone+":;TZID="+cfg.OutputTimezone+":") {
+					line = strings.Replace(line, "DTEND;TZID="+cfg.OutputTimezone+":;TZID="+cfg.OutputTimezone+":", "DTEND;TZID="+cfg.OutputTimezone+":", 1)
+				}
+				fixedLines = append(fixedLines, line)
+			}
+			
+			enhancedOutput := strings.Join(fixedLines, "\n")
 			
 			// Send the enhanced output
 			if _, err := w.Write([]byte(enhancedOutput)); err != nil {

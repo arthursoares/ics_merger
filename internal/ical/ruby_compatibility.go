@@ -177,6 +177,16 @@ func fixEvent(event []string, timezone string) []string {
 	
 	// Fix DTEND format
 	if dtend != "" {
+		// Remove any malformed parameter patterns that might exist (like ;TZID=...:;TZID=...)
+		if strings.HasPrefix(dtend, ";") {
+			// Handle case like ";TZID=Europe/Berlin:20250213T154500"
+			colonPos := strings.Index(dtend, ":")
+			if colonPos > 0 {
+				// Keep only what's after the colon
+				dtend = dtend[colonPos+1:]
+			}
+		}
+		
 		if isAllDay {
 			// Ensure VALUE=DATE parameter for all-day events
 			fixedEvent = append(fixedEvent, fmt.Sprintf("DTEND;VALUE=DATE:%s", dtend))
