@@ -292,6 +292,12 @@ func main() {
 					endTime = startTime.Add(1 * time.Hour)
 				}
 				
+				// Ensure we don't have a zero time for end_time
+				if endTime.IsZero() {
+					// Use fallback of 1 hour after start time
+					endTime = startTime.Add(1 * time.Hour)
+				}
+				
 				// Extract location if available
 				var location string
 				locProp := event.GetProperty(ics.ComponentPropertyLocation)
