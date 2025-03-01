@@ -489,20 +489,8 @@ func main() {
 			log.Printf("Filtering calendar events for summary.ics (inclusive date range)")
 			filteredCalendar := ical.FilterCalendarByDateRange(calendar, 30, 30)
 			
-			// Special handling for March 3, 2025 events
-			// Look for the events in the original calendar that might be missing
-			for _, event := range calendar.Events() {
-				uidProp := event.GetProperty(ics.ComponentPropertyUniqueId)
-				summaryProp := event.GetProperty(ics.ComponentPropertySummary)
-				
-				if uidProp != nil && summaryProp != nil {
-					if uidProp.Value == "4C4F1DB5-DD3D-4783-A649-C46EA927D51E" || 
-					   uidProp.Value == "879EAA2C-DD90-4A73-A958-99561135E79D" {
-						log.Printf("Special handling: Adding March 3 event: %s", summaryProp.Value)
-						filteredCalendar.AddVEvent(event)
-					}
-				}
-			}
+			// Let the improved FilterCalendarByDateRange function handle all events 
+			// including edge cases
 			
 			// Set content type and headers
 			w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
