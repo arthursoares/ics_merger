@@ -504,21 +504,45 @@ func MergeCalendars(calendars map[string]*ics.Calendar) *ics.Calendar {
 	// METHOD is already set above with SetMethod
 	// We're using the golang-ical library, which has limitations with custom properties
 	
-	// Track events by summary to identify duplicates
+	// Track events by a composite key to properly identify duplicates
 	eventMap := make(map[string]*Event)
 	
-	// First pass: identify duplicates
+	// First pass: identify duplicates by UID + start date
 	for calID, cal := range calendars {
 		for _, event := range cal.Events() {
-			summary := event.GetProperty(ics.ComponentPropertySummary).Value
-			uid := event.GetProperty(ics.ComponentPropertyUniqueId).Value
+			// Get summary (required)
+			summaryProp := event.GetProperty(ics.ComponentPropertySummary)
+			if summaryProp == nil {
+				// Skip events without summary
+				continue
+			}
+			summary := summaryProp.Value
 			
-			if existing, ok := eventMap[summary]; ok {
-				// This is a duplicate event, add calendar ID to the list
+			// Get UID (required)
+			uidProp := event.GetProperty(ics.ComponentPropertyUniqueId)
+			if uidProp == nil {
+				// Skip events without UID
+				continue
+			}
+			uid := uidProp.Value
+			
+			// Get start date (required)
+			dtstartProp := event.GetProperty(ics.ComponentPropertyDtStart)
+			if dtstartProp == nil {
+				// Skip events without start date
+				continue
+			}
+			dtstart := dtstartProp.Value
+			
+			// Create a composite key that handles recurring events with the same UID
+			compositeKey := uid + ":" + dtstart
+			
+			if existing, ok := eventMap[compositeKey]; ok {
+				// This is a duplicate event (same UID and start date), add calendar ID to the list
 				existing.CalendarIDs = append(existing.CalendarIDs, calID)
 			} else {
 				// New event
-				eventMap[summary] = &Event{
+				eventMap[compositeKey] = &Event{
 					UID:           uid,
 					Summary:       summary,
 					CalendarIDs:   []string{calID},
