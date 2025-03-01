@@ -644,8 +644,9 @@ func FilterCalendarByDateRange(cal *ics.Calendar, daysBack, daysForward int) *ic
 			continue
 		}
 		
-		// Check if the event is within our date range
-		if eventStart.After(startDate) && eventStart.Before(endDate) {
+		// Check if the event is within our date range (inclusive)
+		if (eventStart.Equal(startDate) || eventStart.After(startDate)) && 
+		   (eventStart.Equal(endDate) || eventStart.Before(endDate)) {
 			// Fix any malformed properties before adding to filtered calendar
 			fixEventProperties(event)
 			filtered.AddVEvent(event)
